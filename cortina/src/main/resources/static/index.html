@@ -37,34 +37,83 @@
     <!-- Curtain Visualization Card -->
     <div class="card curtain-card">
       <div class="curtain-visual" id="curtainVisual">
-        <!-- SVG Curtain Illustration -->
         <svg viewBox="0 0 320 200" xmlns="http://www.w3.org/2000/svg" class="curtain-svg">
-          <!-- Window frame -->
+          <defs>
+            <clipPath id="windowClip">
+              <rect x="48" y="28" width="224" height="144" rx="4" />
+            </clipPath>
+          </defs>
           <rect x="40" y="20" width="240" height="160" rx="6" fill="#B0C4DE" />
+          <rect x="45" y="25" width="230" height="150" rx="5" fill="#94ADC9" />
+          <rect x="34" y="176" width="252" height="7" rx="3.5" fill="#9CB3CE" />
+          <rect x="36" y="176" width="248" height="2.5" rx="1.25" fill="#C4D4E6" />
           <rect x="48" y="28" width="224" height="144" rx="4" fill="#87CEEB" />
-          <!-- Sky & scenery -->
-          <rect x="48" y="28" width="224" height="90" rx="4" fill="#87CEEB" />
-          <ellipse cx="160" cy="60" rx="30" ry="20" fill="white" opacity="0.8"/>
-          <ellipse cx="200" cy="70" rx="20" ry="14" fill="white" opacity="0.7"/>
-          <!-- Ground / bushes -->
-          <rect x="48" y="118" width="224" height="54" rx="0" fill="#90EE90" opacity="0.6"/>
-          <ellipse cx="100" cy="120" rx="28" ry="18" fill="#228B22" opacity="0.7"/>
-          <ellipse cx="220" cy="118" rx="30" ry="20" fill="#228B22" opacity="0.7"/>
-          <!-- Rod -->
-          <rect x="30" y="14" width="260" height="10" rx="5" fill="#808080" />
-          <circle cx="30" cy="19" r="7" fill="#A0A0A0"/>
-          <circle cx="290" cy="19" r="7" fill="#A0A0A0"/>
-          <!-- Left curtain panel -->
-          <g id="curtainLeft">
-            <path d="M48,24 Q65,80 55,172 L48,172 Z" fill="#3B82F6" opacity="0.9"/>
-            <path d="M48,24 Q85,80 72,172 L55,172 Q65,80 48,24 Z" fill="#2563EB"/>
-            <path d="M72,172 Q75,185 68,190 Q78,186 80,172 Z" fill="#1D4ED8"/>
+          <g clip-path="url(#windowClip)">
+            <rect x="48" y="28" width="224" height="144" fill="#87CEEB" />
+            <ellipse cx="145" cy="60" rx="26" ry="15" fill="#FFFFFF" opacity="0.9" />
+            <ellipse cx="127" cy="64" rx="16" ry="11" fill="#FFFFFF" opacity="0.9" />
+            <ellipse cx="163" cy="65" rx="15" ry="10" fill="#FFFFFF" opacity="0.9" />
+            <ellipse cx="222" cy="52" rx="18" ry="11" fill="#FFFFFF" opacity="0.82" />
+            <ellipse cx="209" cy="56" rx="12" ry="8" fill="#FFFFFF" opacity="0.82" />
+            <path d="M48,124 Q104,110 160,122 Q216,134 272,118 L272,172 L48,172 Z" fill="#90EE90" opacity="0.75" />
+            <path d="M48,136 Q115,126 175,135 Q225,142 272,130 L272,172 L48,172 Z" fill="#90EE90" />
+            <circle cx="88" cy="126" r="15" fill="#228B22" opacity="0.85" />
+            <circle cx="104" cy="123" r="18" fill="#228B22" opacity="0.9" />
+            <circle cx="120" cy="128" r="13" fill="#228B22" opacity="0.85" />
+            <circle cx="204" cy="127" r="14" fill="#228B22" opacity="0.85" />
+            <circle cx="222" cy="122" r="19" fill="#228B22" opacity="0.9" />
+            <circle cx="238" cy="126" r="14" fill="#228B22" opacity="0.85" />
+            <rect x="158.5" y="28" width="3" height="144" fill="#B0C4DE" opacity="0.85" />
+            <rect x="48" y="98" width="224" height="3" fill="#B0C4DE" opacity="0.85" />
+            <polygon points="62,28 84,28 54,98 48,98" fill="#FFFFFF" opacity="0.16" />
           </g>
-          <!-- Right curtain panel -->
+          <rect x="36" y="16" width="5" height="10" rx="2" fill="#6B7280" />
+          <rect x="279" y="16" width="5" height="10" rx="2" fill="#6B7280" />
+          <rect x="28" y="15" width="264" height="8" rx="4" fill="#808080" />
+          <rect x="30" y="16" width="260" height="2.5" rx="1.25" fill="#A3A3A3" />
+          <circle cx="28" cy="19" r="6.5" fill="#9CA3AF" />
+          <circle cx="27" cy="17.5" r="2.2" fill="#D1D5DB" />
+          <circle cx="292" cy="19" r="6.5" fill="#9CA3AF" />
+          <circle cx="291" cy="17.5" r="2.2" fill="#D1D5DB" />
+          <g id="curtainLeft">
+            <rect x="59" y="13" width="6" height="10" rx="3" fill="#4B5563" />
+            <rect x="60.5" y="15" width="3" height="5" rx="1.5" fill="#9CA3AF" />
+            <rect x="87" y="13" width="6" height="10" rx="3" fill="#4B5563" />
+            <rect x="88.5" y="15" width="3" height="5" rx="1.5" fill="#9CA3AF" />
+            <rect x="115" y="13" width="6" height="10" rx="3" fill="#4B5563" />
+            <rect x="116.5" y="15" width="3" height="5" rx="1.5" fill="#9CA3AF" />
+            <rect x="143" y="13" width="6" height="10" rx="3" fill="#4B5563" />
+            <rect x="144.5" y="15" width="3" height="5" rx="1.5" fill="#9CA3AF" />
+            <path d="M48,22 L160,22 L160,169 Q146,175 132,169 Q118,175 104,169 Q90,175 76,169 Q62,175 48,169 Z" fill="#2563EB" />
+            <path d="M53,22 L67,22 Q69,96 66,171.6 Q60,172.3 53,170.5 Q55,96 53,22 Z" fill="#3B82F6" />
+            <path d="M81,22 L95,22 Q97,96 94,171.6 Q88,172.3 81,170.5 Q83,96 81,22 Z" fill="#3B82F6" />
+            <path d="M109,22 L123,22 Q125,96 122,171.6 Q116,172.3 109,170.5 Q111,96 109,22 Z" fill="#3B82F6" />
+            <path d="M137,22 L151,22 Q153,96 150,171.6 Q144,172.3 137,170.5 Q139,96 137,22 Z" fill="#3B82F6" />
+            <path d="M72,22 L78,22 Q79,96 78,169.6 Q75,170.2 72,169.6 Q74,96 72,22 Z" fill="#1D4ED8" />
+            <path d="M100,22 L106,22 Q107,96 106,169.6 Q103,170.2 100,169.6 Q102,96 100,22 Z" fill="#1D4ED8" />
+            <path d="M128,22 L134,22 Q135,96 134,169.6 Q131,170.2 128,169.6 Q130,96 128,22 Z" fill="#1D4ED8" />
+            <path d="M156,22 L160,22 L160,169 Q157.5,170 155,169.8 Q157,96 156,22 Z" fill="#1D4ED8" />
+            <rect x="48" y="22" width="112" height="4" rx="1" fill="#1D4ED8" opacity="0.45" />
+          </g>
           <g id="curtainRight">
-            <path d="M272,24 Q255,80 265,172 L272,172 Z" fill="#3B82F6" opacity="0.9"/>
-            <path d="M272,24 Q235,80 248,172 L265,172 Q255,80 272,24 Z" fill="#2563EB"/>
-            <path d="M248,172 Q245,185 252,190 Q242,186 240,172 Z" fill="#1D4ED8"/>
+            <rect x="255" y="13" width="6" height="10" rx="3" fill="#4B5563" />
+            <rect x="256.5" y="15" width="3" height="5" rx="1.5" fill="#9CA3AF" />
+            <rect x="227" y="13" width="6" height="10" rx="3" fill="#4B5563" />
+            <rect x="228.5" y="15" width="3" height="5" rx="1.5" fill="#9CA3AF" />
+            <rect x="199" y="13" width="6" height="10" rx="3" fill="#4B5563" />
+            <rect x="200.5" y="15" width="3" height="5" rx="1.5" fill="#9CA3AF" />
+            <rect x="171" y="13" width="6" height="10" rx="3" fill="#4B5563" />
+            <rect x="172.5" y="15" width="3" height="5" rx="1.5" fill="#9CA3AF" />
+            <path d="M272,22 L160,22 L160,169 Q174,175 188,169 Q202,175 216,169 Q230,175 244,169 Q258,175 272,169 Z" fill="#2563EB" />
+            <path d="M267,22 L253,22 Q251,96 254,171.6 Q260,172.3 267,170.5 Q265,96 267,22 Z" fill="#3B82F6" />
+            <path d="M239,22 L225,22 Q223,96 226,171.6 Q232,172.3 239,170.5 Q237,96 239,22 Z" fill="#3B82F6" />
+            <path d="M211,22 L197,22 Q195,96 198,171.6 Q204,172.3 211,170.5 Q209,96 211,22 Z" fill="#3B82F6" />
+            <path d="M183,22 L169,22 Q167,96 170,171.6 Q176,172.3 183,170.5 Q181,96 183,22 Z" fill="#3B82F6" />
+            <path d="M248,22 L242,22 Q241,96 242,169.6 Q245,170.2 248,169.6 Q246,96 248,22 Z" fill="#1D4ED8" />
+            <path d="M220,22 L214,22 Q213,96 214,169.6 Q217,170.2 220,169.6 Q218,96 220,22 Z" fill="#1D4ED8" />
+            <path d="M192,22 L186,22 Q185,96 186,169.6 Q189,170.2 192,169.6 Q190,96 192,22 Z" fill="#1D4ED8" />
+            <path d="M164,22 L160,22 L160,169 Q162.5,170 165,169.8 Q163,96 164,22 Z" fill="#1D4ED8" />
+            <rect x="160" y="22" width="112" height="4" rx="1" fill="#1D4ED8" opacity="0.45" />
           </g>
         </svg>
       </div>

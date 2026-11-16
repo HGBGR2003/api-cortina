@@ -19,10 +19,29 @@ public class CurtainStateService {
 
     public void applyCommand(CurtainAction action) {
         desired.updateAndGet(s -> s.withAction(action));
+        HardwareState nextState = switch (action) {
+            case OPEN -> HardwareState.OPENED;
+            case CLOSE -> HardwareState.CLOSED;
+            case STOP -> HardwareState.STOPPED;
+        };
+        telemetry.updateAndGet(t -> new TelemetrySnapshot(
+            nextState, t.luminosity(), t.limitOpen(), t.limitClose(), t.online(), t.lastSync()
+        ));
     }
 
     public void applyModeConfig(CurtainMode mode, AutoRule rule, int threshold) {
         desired.updateAndGet(s -> s.withAutoConfig(mode, rule, threshold));
+        if (mode == CurtainMode.AUTO) {
+            telemetry.updateAndGet(t -> {
+                if (!t.online() || t.currentState() == HardwareState.UNKNOWN) {
+                    HardwareState resolved = resolveAutoState(t.luminosity(), rule, threshold);
+                    return new TelemetrySnapshot(
+                        resolved, t.luminosity(), t.limitOpen(), t.limitClose(), t.online(), t.lastSync()
+                    );
+                }
+                return t;
+            });
+        }
     }
 
     // --- Telemetry updater (called by HW sync) ---
@@ -39,7 +58,21 @@ public class CurtainStateService {
     }
 
     public TelemetrySnapshot getTelemetry() {
-        return telemetry.get();
+        TelemetrySnapshot snap = telemetry.get();
+        CurtainDesiredState d = desired.get();
+        if (d.mode() == CurtainMode.AUTO && snap.currentState() == HardwareState.UNKNOWN) {
+            HardwareState resolved = resolveAutoState(snap.luminosity(), d.autoRule(), d.lightThreshold());
+            return new TelemetrySnapshot(
+                resolved, snap.luminosity(), snap.limitOpen(), snap.limitClose(), snap.online(), snap.lastSync()
+            );
+        }
+        return snap;
+    }
+
+    private HardwareState resolveAutoState(int luminosity, AutoRule rule, int threshold) {
+        boolean bright = luminosity > threshold;
+        boolean shouldOpen = (rule == AutoRule.STANDARD) ? bright : !bright;
+        return shouldOpen ? HardwareState.OPENED : HardwareState.CLOSED;
     }
 
     // Build the compact command string for the hardware

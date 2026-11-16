@@ -243,17 +243,38 @@ body {
 }
 .modal-box input:focus { border-color: var(--blue-primary); }
 
-/* Curtain animation classes */
 .curtain-visual { position: relative; }
-.curtain-opening #curtainLeft  { animation: slideLeft  0.6s ease forwards; }
-.curtain-opening #curtainRight { animation: slideRight 0.6s ease forwards; }
-.curtain-closing #curtainLeft  { animation: slideLeftBack  0.6s ease forwards; }
-.curtain-closing #curtainRight { animation: slideRightBack 0.6s ease forwards; }
 
-@keyframes slideLeft      { from { transform: translateX(0); }   to { transform: translateX(-40px); } }
-@keyframes slideRight     { from { transform: translateX(0); }   to { transform: translateX(40px); } }
-@keyframes slideLeftBack  { from { transform: translateX(-40px); } to { transform: translateX(0); } }
-@keyframes slideRightBack { from { transform: translateX(40px); }  to { transform: translateX(0); } }
+#curtainLeft {
+  transform-box: view-box;
+  transform-origin: 48px 24px;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#curtainRight {
+  transform-box: view-box;
+  transform-origin: 272px 24px;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.curtain-open #curtainLeft,
+.curtain-opening #curtainLeft,
+.curtain-open #curtainRight,
+.curtain-opening #curtainRight {
+  transform: scaleX(0.26);
+}
+
+.curtain-closed #curtainLeft,
+.curtain-closing #curtainLeft,
+.curtain-closed #curtainRight,
+.curtain-closing #curtainRight {
+  transform: scaleX(1);
+}
+
+.curtain-stopped #curtainLeft,
+.curtain-stopped #curtainRight {
+  transform: scaleX(0.55);
+}
 
 /* Responsive */
 @media (min-width: 480px) {

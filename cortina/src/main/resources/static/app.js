@@ -3,6 +3,7 @@ let authToken = localStorage.getItem('cortina_token') || '';
 let currentAutoRule = 'STANDARD';
 let isAutoMode = false;
 let pollingInterval = null;
+let latestSeq = 0;
 
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', () => {
@@ -45,17 +46,55 @@ function startPolling() {
 }
 
 async function fetchStatus() {
+  const seq = latestSeq;
   try {
     const res = await apiFetch('/api/v1/curtain/status');
+    if (seq !== latestSeq) return;
     if (!res.ok) {
       setOffline();
       return;
     }
     const data = await res.json();
+    if (seq !== latestSeq) return;
     updateUI(data);
   } catch (e) {
-    setOffline();
+    if (seq === latestSeq) setOffline();
   }
+}
+
+function applyCurtainState(state) {
+  const stateEl = document.getElementById('curtainStateText');
+  const visual = document.getElementById('curtainVisual');
+  const stateMap = {
+    OPENED:  { label: 'aberta',   cls: 'curtain-open'    },
+    OPENING: { label: 'abrindo',  cls: 'curtain-opening' },
+    CLOSED:  { label: 'fechada',  cls: 'curtain-closed'  },
+    CLOSING: { label: 'fechando', cls: 'curtain-closing' },
+    STOPPED: { label: 'parada',   cls: 'curtain-stopped' },
+    UNKNOWN: { label: '...',      cls: 'curtain-open'    },
+  };
+  const s = stateMap[state] || { label: state, cls: '' };
+  stateEl.textContent = s.label;
+  visual.className = s.cls ? 'curtain-visual ' + s.cls : 'curtain-visual';
+}
+
+function resolveCurtainState(data) {
+  if (data.currentState && data.currentState !== 'UNKNOWN') {
+    return data.currentState;
+  }
+  if (data.limitOpen) return 'OPENED';
+  if (data.limitClose) return 'CLOSED';
+  if (data.mode === 'AUTO') {
+    const bright = (data.luminosity ?? 0) > (data.lightThreshold ?? 700);
+    const shouldOpen = data.autoRule === 'INVERTED' ? !bright : bright;
+    return shouldOpen ? 'OPENED' : 'CLOSED';
+  }
+  const actionMap = {
+    OPEN: 'OPENED',
+    CLOSE: 'CLOSED',
+    STOP: 'STOPPED',
+  };
+  return actionMap[data.targetAction] || 'UNKNOWN';
 }
 
 // ---- UI Update ----
@@ -71,20 +110,7 @@ function updateUI(data) {
     txt.textContent = 'Arduino desconectado';
   }
 
-  // Curtain state
-  const stateEl = document.getElementById('curtainStateText');
-  const visual   = document.getElementById('curtainVisual');
-  const stateMap = {
-    OPENED:  { label: 'aberta',   cls: 'curtain-open'    },
-    OPENING: { label: 'abrindo',  cls: 'curtain-opening' },
-    CLOSED:  { label: 'fechada',  cls: 'curtain-closed'  },
-    CLOSING: { label: 'fechando', cls: 'curtain-closing' },
-    STOPPED: { label: 'parada',   cls: ''                },
-    UNKNOWN: { label: '...',      cls: ''                },
-  };
-  const s = stateMap[data.currentState] || { label: data.currentState, cls: '' };
-  stateEl.textContent = s.label;
-  visual.className = 'curtain-visual ' + s.cls;
+  applyCurtainState(resolveCurtainState(data));
 
   // Mode toggle
   const toggle = document.getElementById('autoModeToggle');
@@ -145,13 +171,25 @@ function updateRuleUI(rule) {
 
 // ---- Commands ----
 async function sendCommand(action) {
+  const actionStateMap = {
+    OPEN: 'OPENED',
+    CLOSE: 'CLOSED',
+    STOP: 'STOPPED',
+  };
+  latestSeq++;
+  if (actionStateMap[action]) {
+    applyCurtainState(actionStateMap[action]);
+  }
+  isAutoMode = false;
+  document.getElementById('autoModeToggle').checked = false;
+
   try {
     const res = await apiFetch('/api/v1/curtain/command', {
       method: 'POST',
       body: JSON.stringify({ action })
     });
     if (!res.ok) console.error('Command failed', await res.text());
-    else fetchStatus();
+    else await fetchStatus();
   } catch (e) {
     console.error('Command error', e);
   }
@@ -159,13 +197,16 @@ async function sendCommand(action) {
 
 async function onModeToggle() {
   const toggle = document.getElementById('autoModeToggle');
-  const mode = toggle.checked ? 'AUTO' : 'MANUAL';
+  isAutoMode = toggle.checked;
+  const mode = isAutoMode ? 'AUTO' : 'MANUAL';
+  latestSeq++;
   await postMode(mode, currentAutoRule);
 }
 
 async function selectRule(rule) {
   currentAutoRule = rule;
   updateRuleUI(rule);
+  latestSeq++;
   await postMode(isAutoMode ? 'AUTO' : 'MANUAL', rule);
 }
 
@@ -180,7 +221,7 @@ async function postMode(mode, rule) {
       })
     });
     if (!res.ok) console.error('Mode failed', await res.text());
-    else fetchStatus();
+    else await fetchStatus();
   } catch (e) {
     console.error('Mode error', e);
   }
