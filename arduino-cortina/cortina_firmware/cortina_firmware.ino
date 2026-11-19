@@ -1,14 +1,3 @@
-/**
- * ============================================================================
- * FIRMWARE: CORTINA AUTOMATIZADA (ARDUINO UNO R3 + 28BYJ-48 + LDR + ESP-01)
- * ============================================================================
- * Microcontrolador : ATmega328P (Arduino Uno R3 - 2 KB SRAM)
- * Arquitetura      : Loop nao-bloqueante orientado a maquinas de estado
- * Otimizacao RAM   : Zero uso de String dinamica; uso de F(), char[] e snprintf_P
- * Comunicacao Dupla: Monitor Serial USB (bancada) + HTTP/AT via ESP-01 (API)
- * ============================================================================
- */
-
 #include <Arduino.h>
 #include <Stepper.h>
 #include <SoftwareSerial.h>
@@ -17,69 +6,48 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ============================================================================
-// 1. CONFIGURACOES DE HARDWARE, REDE E TEMPORIZACAO
-// ============================================================================
-
-// Pinos do Motor de Passo 28BYJ-48 + Driver ULN2003
 const uint8_t PIN_MOTOR_IN1 = 8;
 const uint8_t PIN_MOTOR_IN2 = 9;
 const uint8_t PIN_MOTOR_IN3 = 10;
 const uint8_t PIN_MOTOR_IN4 = 11;
 
-// Pinos dos Sensores de Fim de Curso (INPUT_PULLUP: LOW = acionado, HIGH = livre)
 const uint8_t PIN_LIMIT_OPEN  = 2;
 const uint8_t PIN_LIMIT_CLOSE = 3;
+const uint8_t PIN_LDR         = A1;
 
-// Pino do Sensor de Luminosidade (LDR)
-const uint8_t PIN_LDR = A1;
-
-// Pinos do Modulo Wi-Fi ESP-01 (SoftwareSerial)
-// Pino 6 = RX do Arduino (ligar ao TX do ESP-01 via divisor/conversor logico)
-// Pino 7 = TX do Arduino (ligar ao RX do ESP-01 via divisor/conversor logico)
 const uint8_t PIN_ESP_RX = 6;
 const uint8_t PIN_ESP_TX = 7;
 
-// Taxa de transmissao Serial (USB e ESP-01)
 const unsigned long SERIAL_BAUD_RATE = 9600UL;
 
-// Parametros do Motor 28BYJ-48
 const int           MOTOR_STEPS_PER_REV = 2048;
-const long          MOTOR_SPEED_RPM     = 15;     // Stepper.step(1) nao bloqueia se STEP_INTERVAL_US >= step_delay
-const unsigned long STEP_INTERVAL_US    = 2500UL; // ~400 passos/s (~2.5 ms por passo)
-const int8_t        STEP_DIR_OPEN       = 1;      // Inverta para -1 se o sentido mecanico abrir ao contrario
+const long          MOTOR_SPEED_RPM     = 15;
+const unsigned long STEP_INTERVAL_US    = 2500UL;
+const int8_t        STEP_DIR_OPEN       = 1;
 const int8_t        STEP_DIR_CLOSE      = -1;
 
-// Parametros de Luminosidade e Histerese
 const int           DEFAULT_LIGHT_THRESHOLD = 700;
 const int           LIGHT_HYSTERESIS_MARGIN = 30;
-const unsigned long LIGHT_DEBOUNCE_MS       = 3000UL; // 3 segundos continuos para confirmar Claro/Escuro
-const unsigned long LDR_SAMPLE_INTERVAL_MS  = 50UL;   // Intervalo de leitura do ADC
+const unsigned long LIGHT_DEBOUNCE_MS       = 3000UL;
+const unsigned long LDR_SAMPLE_INTERVAL_MS  = 50UL;
 
-// Credenciais Wi-Fi e Configuracao da API Java 25 (Ajuste para o seu ambiente)
 const char     WIFI_SSID[]  = "SUA_REDE_WIFI";
 const char     WIFI_PASS[]  = "SUA_SENHA_WIFI";
 const char     API_HOST[]   = "192.168.1.100";
 const uint16_t API_PORT     = 8080;
-const char     AUTH_TOKEN[] = "SEU_TOKEN_AQUI";
+const char     AUTH_TOKEN[] = "cortina-secret-token-2025";
 
-// Temporizacoes do Cliente HTTP / AT (ms)
-const unsigned long SYNC_INTERVAL_MS        = 3000UL;
-const unsigned long ESP_BOOT_PROBE_MS       = 800UL;
-const unsigned long ESP_CMD_TIMEOUT_MS      = 2500UL;
-const unsigned long ESP_WIFI_TIMEOUT_MS     = 15000UL;
-const unsigned long ESP_HTTP_TIMEOUT_MS     = 3500UL;
-const unsigned long ESP_IPD_IDLE_MS         = 120UL;
-const unsigned long ESP_ERROR_BACKOFF_MS    = 5000UL;
+const unsigned long SYNC_INTERVAL_MS     = 3000UL;
+const unsigned long ESP_BOOT_PROBE_MS    = 800UL;
+const unsigned long ESP_CMD_TIMEOUT_MS   = 2500UL;
+const unsigned long ESP_WIFI_TIMEOUT_MS  = 15000UL;
+const unsigned long ESP_HTTP_TIMEOUT_MS  = 3500UL;
+const unsigned long ESP_IPD_IDLE_MS      = 120UL;
+const unsigned long ESP_ERROR_BACKOFF_MS = 5000UL;
 
-// Tamanhos fixos de buffers em RAM
 const uint8_t USB_RX_BUF_SIZE = 72;
 const uint8_t ESP_RX_BUF_SIZE = 128;
 const uint8_t HTTP_BUF_SIZE   = 224;
-
-// ============================================================================
-// 2. ESTRUTURAS DE ESTADO (ENUMS)
-// ============================================================================
 
 enum CurtainState : uint8_t {
   STATE_STOPPED = 0,
@@ -95,8 +63,8 @@ enum OperationMode : char {
 };
 
 enum AutoRule : char {
-  RULE_STANDARD = 'S', // Claro abre, Escuro fecha
-  RULE_INVERTED = 'I'  // Claro fecha, Escuro abre
+  RULE_STANDARD = 'S',
+  RULE_INVERTED = 'I'
 };
 
 enum TargetAction : char {
@@ -132,72 +100,63 @@ enum EspState : uint8_t {
   ESP_ERROR_BACKOFF
 };
 
-// ============================================================================
-// 3. INSTANCIAS DE HARDWARE E VARIAVEIS GLOBAIS
-// ============================================================================
-
-// Sequencia obrigatoria (8, 10, 9, 11) para chaveamento correto das bobinas do 28BYJ-48
 Stepper stepperMotor(MOTOR_STEPS_PER_REV, PIN_MOTOR_IN1, PIN_MOTOR_IN3, PIN_MOTOR_IN2, PIN_MOTOR_IN4);
 SoftwareSerial espSerial(PIN_ESP_RX, PIN_ESP_TX);
 
-// Estado fisico e configuracoes da cortina
 CurtainState  curtainState   = STATE_STOPPED;
 OperationMode operationMode  = MODE_AUTO;
 AutoRule      autoRule       = RULE_STANDARD;
 TargetAction  targetAction   = TARGET_STOP;
 int           lightThreshold = DEFAULT_LIGHT_THRESHOLD;
 
-// Leituras dos sensores em tempo real
 int  currentLdrValue     = 0;
 bool limitOpenTriggered  = false;
 bool limitCloseTriggered = false;
 
-// Controle de histerese temporal do LDR
 LightCondition pendingLightState   = LIGHT_NONE;
 LightCondition confirmedLightState = LIGHT_NONE;
 unsigned long  lightStateStartMs   = 0UL;
 unsigned long  lastLdrSampleMs     = 0UL;
 
-// Controle de passo nao-bloqueante
 unsigned long lastStepMicros = 0UL;
 
-// Buffer de leitura USB Serial
 char    usbRxBuf[USB_RX_BUF_SIZE];
 uint8_t usbRxLen = 0;
 
-// Maquina de estados e buffers do ESP-01
-EspState      espState          = ESP_DISABLED;
+EspState      espState             = ESP_DISABLED;
 char          espRxBuf[ESP_RX_BUF_SIZE];
-uint8_t       espRxLen          = 0;
+uint8_t       espRxLen             = 0;
 char          httpBuf[HTTP_BUF_SIZE];
-unsigned long espStateStartMs       = 0UL;
-unsigned long espLastByteMs         = 0UL;
-unsigned long lastSyncMs            = 0UL;
-bool          espWifiHasAp          = false;
-bool          espBackoffAfterClose  = false;
-
-// ============================================================================
-// 4. PROTOTIPOS EXPLICITOS
-// ============================================================================
+unsigned long espStateStartMs      = 0UL;
+unsigned long espLastByteMs        = 0UL;
+unsigned long lastSyncMs           = 0UL;
+bool          espWifiHasAp         = false;
+bool          espBackoffAfterClose = false;
 
 void disableMotorCoils();
 void setCurtainState(CurtainState newState);
 bool isMotorMoving();
 const char* stateToStr(CurtainState st);
 void updateMotor();
+void resetLdrHysteresis();
 void readSensors();
+void requestOpen();
+void requestClose();
 void updateControlLogic();
 bool parseCommand(const char* line);
 void readUsbSerial();
 void processUsbLine(char* line);
 void printStatus();
 void printHelp();
+void clearEspRxBuffer();
+void drainEspInput();
+void enterEspState(EspState nextState);
+bool waitEspResponseBlockingInit(const char* expected, unsigned long timeoutMs);
 bool initEsp01();
+void buildHttpSyncRequest();
+void handleEspLine(const char* line);
+void pollEspSerialNonBlocking();
 void updateEspClient();
-
-// ============================================================================
-// 5. FUNCOES AUXILIARES DE ESTADO E MOTOR
-// ============================================================================
 
 void disableMotorCoils() {
   digitalWrite(PIN_MOTOR_IN1, LOW);
@@ -241,7 +200,6 @@ void updateMotor() {
     return;
   }
 
-  // Protecao redundante antes de qualquer passo
   if (curtainState == STATE_OPENING && limitOpenTriggered) {
     setCurtainState(STATE_OPENED);
     targetAction = TARGET_STOP;
@@ -264,10 +222,6 @@ void updateMotor() {
   }
 }
 
-// ============================================================================
-// 6. LEITURA DE SENSORES, TRAVA DE SEGURANCA E HISTERESE
-// ============================================================================
-
 void resetLdrHysteresis() {
   pendingLightState   = LIGHT_NONE;
   confirmedLightState = LIGHT_NONE;
@@ -275,11 +229,9 @@ void resetLdrHysteresis() {
 }
 
 void readSensors() {
-  // 1. Leitura instantanea dos fins de curso em todo ciclo de loop()
   limitOpenTriggered  = (digitalRead(PIN_LIMIT_OPEN) == LOW);
   limitCloseTriggered = (digitalRead(PIN_LIMIT_CLOSE) == LOW);
 
-  // Prioridade Maxima: trava imediata de fim de curso
   if (limitOpenTriggered && curtainState == STATE_OPENING) {
     setCurtainState(STATE_OPENED);
     targetAction = TARGET_STOP;
@@ -289,7 +241,6 @@ void readSensors() {
     targetAction = TARGET_STOP;
   }
 
-  // 2. Amostragem do LDR e calculo da histerese temporal (3000 ms)
   unsigned long nowMs = millis();
   if ((unsigned long)(nowMs - lastLdrSampleMs) >= LDR_SAMPLE_INTERVAL_MS) {
     lastLdrSampleMs = nowMs;
@@ -307,7 +258,6 @@ void readSensors() {
       }
 
       if (instantLight == LIGHT_NONE) {
-        // Faixa morta de histerese: zera apenas a contagem pendente
         pendingLightState = LIGHT_NONE;
       } else if (instantLight != pendingLightState) {
         pendingLightState = instantLight;
@@ -340,7 +290,6 @@ void requestClose() {
 }
 
 void updateControlLogic() {
-  // Falha de seguranca: ambos fins de curso acionados simultaneamente
   if (limitOpenTriggered && limitCloseTriggered) {
     if (isMotorMoving()) {
       setCurtainState(STATE_STOPPED);
@@ -355,7 +304,6 @@ void updateControlLogic() {
     } else if (targetAction == TARGET_CLOSE) {
       requestClose();
     } else {
-      // TARGET_STOP: para o motor imediatamente
       if (isMotorMoving()) {
         setCurtainState(STATE_STOPPED);
       } else if (curtainState == STATE_OPENED && !limitOpenTriggered) {
@@ -367,7 +315,6 @@ void updateControlLogic() {
     return;
   }
 
-  // Modo AUTO (usa apenas condicao luminosa confirmada apos 3000 ms)
   if (confirmedLightState == LIGHT_BRIGHT) {
     if (autoRule == RULE_STANDARD) {
       requestOpen();
@@ -382,10 +329,6 @@ void updateControlLogic() {
     }
   }
 }
-
-// ============================================================================
-// 7. PARSER UNIVERSAL E SIMULACAO DE BANCADA (USB SERIAL)
-// ============================================================================
 
 bool parseCommand(const char* line) {
   if (line == nullptr) {
@@ -470,7 +413,6 @@ bool parseCommand(const char* line) {
       }
       p = d;
     } else {
-      // Avanca ate a proxima virgula se houver token desconhecido ou sufixo (ex.: CLOSED)
       while (*p != '\0' && *p != ',' && *p != '\r' && *p != '\n') {
         p++;
       }
@@ -553,7 +495,6 @@ void printHelp() {
 }
 
 void processUsbLine(char* line) {
-  // Remove espacos iniciais e finais
   while (*line == ' ' || *line == '\t') {
     line++;
   }
@@ -631,16 +572,11 @@ void readUsbSerial() {
     } else if (usbRxLen < USB_RX_BUF_SIZE - 1) {
       usbRxBuf[usbRxLen++] = c;
     } else {
-      // Buffer cheio: descarta linha corrompida com seguranca
       usbRxLen = 0;
       Serial.println(F("[USB] Erro: linha muito longa."));
     }
   }
 }
-
-// ============================================================================
-// 8. CLIENTE HTTP AT NAO-BLOQUEANTE (ESP-01)
-// ============================================================================
 
 void clearEspRxBuffer() {
   espRxLen = 0;
@@ -669,7 +605,6 @@ bool waitEspResponseBlockingInit(const char* expected, unsigned long timeoutMs) 
         espRxBuf[espRxLen++] = c;
         espRxBuf[espRxLen] = '\0';
       } else {
-        // Desliza metade do buffer para manter busca continua
         memmove(espRxBuf, espRxBuf + (ESP_RX_BUF_SIZE / 2), (ESP_RX_BUF_SIZE / 2));
         espRxLen = (ESP_RX_BUF_SIZE / 2) - 1;
         espRxBuf[espRxLen++] = c;
@@ -690,12 +625,10 @@ bool initEsp01() {
     return false;
   }
 
-  // Desativa eco para reduzir trafego e economizar processamento
   drainEspInput();
   espSerial.println(F("ATE0"));
   waitEspResponseBlockingInit("OK", 400UL);
 
-  // Modo Station
   drainEspInput();
   espSerial.println(F("AT+CWMODE=1"));
   waitEspResponseBlockingInit("OK", 500UL);
@@ -808,7 +741,6 @@ void pollEspSerialNonBlocking() {
       espRxBuf[espRxLen++] = c;
       espRxBuf[espRxLen] = '\0';
     } else {
-      // Buffer cheio: processa antes de limpar caso haja CMD:
       if (espState == ESP_WAIT_RESPONSE && strstr_P(espRxBuf, PSTR("CMD:")) != nullptr) {
         parseCommand(espRxBuf);
         lastSyncMs = millis();
@@ -817,14 +749,12 @@ void pollEspSerialNonBlocking() {
       clearEspRxBuffer();
     }
 
-    // Prompt '>' do AT+CIPSEND nao possui quebra de linha
     if (espState == ESP_WAIT_PROMPT && c == '>') {
       clearEspRxBuffer();
       enterEspState(ESP_SEND_DATA);
       return;
     }
 
-    // Caso o servidor envie CMD:... seguido imediatamente de CLOSED sem '\n'
     if (espState == ESP_WAIT_RESPONSE && strstr_P(espRxBuf, PSTR("CLOSED")) != nullptr) {
       handleEspLine(espRxBuf);
       clearEspRxBuffer();
@@ -832,7 +762,6 @@ void pollEspSerialNonBlocking() {
     }
   }
 
-  // Trata corpo HTTP sem '\n' final apos breve ociosidade da linha serial
   if (espState == ESP_WAIT_RESPONSE && espRxLen > 0 &&
       (unsigned long)(millis() - espLastByteMs) >= ESP_IPD_IDLE_MS) {
     if (strstr_P(espRxBuf, PSTR("CMD:")) != nullptr) {
@@ -850,7 +779,6 @@ void updateEspClient() {
     return;
   }
 
-  // Recebe bytes pendentes do ESP-01 sem bloquear
   pollEspSerialNonBlocking();
 
   unsigned long nowMs = millis();
@@ -897,14 +825,12 @@ void updateEspClient() {
       break;
 
     case ESP_IDLE:
-      // So inicia transmissao HTTP quando o motor estiver parado (evita engasgos de passo)
       if (!isMotorMoving() && (unsigned long)(nowMs - lastSyncMs) >= SYNC_INTERVAL_MS) {
         enterEspState(ESP_TCP_START);
       }
       break;
 
     case ESP_TCP_START:
-      // Aborta inicio se o motor comecou a mover nesse exato ciclo
       if (isMotorMoving()) {
         enterEspState(ESP_IDLE);
         break;
@@ -983,10 +909,6 @@ void updateEspClient() {
   }
 }
 
-// ============================================================================
-// 9. SETUP E LOOP PRINCIPAL
-// ============================================================================
-
 void setup() {
   Serial.begin(SERIAL_BAUD_RATE);
   espSerial.begin(SERIAL_BAUD_RATE);
@@ -1003,7 +925,6 @@ void setup() {
 
   stepperMotor.setSpeed(MOTOR_SPEED_RPM);
 
-  // Leitura inicial dos sensores para determinar estado fisico de partida
   limitOpenTriggered  = (digitalRead(PIN_LIMIT_OPEN) == LOW);
   limitCloseTriggered = (digitalRead(PIN_LIMIT_CLOSE) == LOW);
   currentLdrValue     = analogRead(PIN_LDR);
@@ -1030,62 +951,9 @@ void setup() {
 }
 
 void loop() {
-  // 1. Leitura imediata dos fins de curso e amostragem do LDR (prioridade maxima)
   readSensors();
-
-  // 2. Comandos via Monitor Serial USB (simulacao de bancada)
   readUsbSerial();
-
-  // 3. Regras de negocio (Manual vs Automatico com histerese)
   updateControlLogic();
-
-  // 4. Avanco nao-bloqueante do motor de passo (ou desenergizacao se parado)
   updateMotor();
-
-  // 5. Sincronizacao HTTP nao-bloqueante via ESP-01
   updateEspClient();
 }
-
-/*
- * ============================================================================
- * GUIA RAPIDO DE BANCADA E LABORATORIO
- * ============================================================================
- *
- * 1) TABELA DE PINAGEM FISICA (Arduino Uno R3):
- * +-------------------+--------------------+---------------------------------+
- * | Componente        | Pino do Componente | Pino no Arduino Uno R3          |
- * +-------------------+--------------------+---------------------------------+
- * | Motor 28BYJ-48    | IN1                | D8                              |
- * | (Driver ULN2003)  | IN2                | D9                              |
- * |                   | IN3                | D10                             |
- * |                   | IN4                | D11                             |
- * |                   | VCC / GND          | Fonte externa 5V / GND comum    |
- * +-------------------+--------------------+---------------------------------+
- * | Fim de Curso Open | COM / NO           | GND / D2 (INPUT_PULLUP)         |
- * | Fim de Curso Close| COM / NO           | GND / D3 (INPUT_PULLUP)         |
- * +-------------------+--------------------+---------------------------------+
- * | Sensor LDR        | Divisor resistivo  | A1 (0..1023)                    |
- * +-------------------+--------------------+---------------------------------+
- * | Modulo ESP-01     | TXD                | D6 (RX Arduino, conv. 3.3V->5V) |
- * | (ESP8266 @ 9600)  | RXD                | D7 (TX Arduino, conv. 5V->3.3V) |
- * |                   | VCC / CH_PD / GND  | 3.3V dedicado (>=300mA) / GND   |
- * +-------------------+--------------------+---------------------------------+
- *
- * 2) EXEMPLOS DE COMANDOS PARA COLAR NO MONITOR SERIAL (9600 baud, NL/CR):
- *
- * - Atalhos rapidos de bancada:
- *   ABRIR
- *   FECHAR
- *   PARAR
- *   AUTO
- *   INVERTER
- *   STATUS
- *
- * - Protocolo compacto da API (CMD):
- *   CMD:M=M,R=S,T=O,TH=700   -> Modo Manual, abrir cortina
- *   CMD:M=M,R=S,T=C,TH=700   -> Modo Manual, fechar cortina
- *   CMD:M=M,R=S,T=S,TH=700   -> Modo Manual, parar imediatamente
- *   CMD:M=A,R=S,T=S,TH=700   -> Modo Automatico padrao (Claro >=730 abre, Escuro <=670 fecha)
- *   CMD:M=A,R=I,T=S,TH=650   -> Modo Automatico invertido (Claro >=680 fecha, Escuro <=620 abre)
- * ============================================================================
- */
